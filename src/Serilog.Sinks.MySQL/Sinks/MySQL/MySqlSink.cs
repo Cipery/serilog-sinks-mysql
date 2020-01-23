@@ -76,7 +76,7 @@ namespace Serilog.Sinks.MySQL
             var cmd = sqlConnection.CreateCommand();
             cmd.CommandText = tableCommandBuilder.ToString();
 
-            cmd.Parameters.Add(new MySqlParameter("@ts", MySqlDbType.VarChar));
+            cmd.Parameters.Add(new MySqlParameter("@ts", MySqlDbType.DateTime));
             cmd.Parameters.Add(new MySqlParameter("@level", MySqlDbType.VarChar));
             cmd.Parameters.Add(new MySqlParameter("@template", MySqlDbType.VarChar));
             cmd.Parameters.Add(new MySqlParameter("@msg", MySqlDbType.VarChar));
@@ -92,13 +92,14 @@ namespace Serilog.Sinks.MySQL
                 var tableCommandBuilder = new StringBuilder();
                 tableCommandBuilder.Append($"CREATE TABLE IF NOT EXISTS {_tableName} (");
                 tableCommandBuilder.Append("id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,");
-                tableCommandBuilder.Append("Timestamp VARCHAR(100),");
+                tableCommandBuilder.Append("Timestamp datetime(6),");
                 tableCommandBuilder.Append("Level VARCHAR(15),");
                 tableCommandBuilder.Append("Template TEXT,");
                 tableCommandBuilder.Append("Message TEXT,");
                 tableCommandBuilder.Append("Exception TEXT,");
                 tableCommandBuilder.Append("Properties TEXT,");
-                tableCommandBuilder.Append("_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+                tableCommandBuilder.Append("KEY `Timestamp` (`Timestamp`),");
+                tableCommandBuilder.Append("KEY `Level` (`Level`))");
 
                 var cmd = sqlConnection.CreateCommand();
                 cmd.CommandText = tableCommandBuilder.ToString();
@@ -120,11 +121,8 @@ namespace Serilog.Sinks.MySQL
                         foreach (var logEvent in logEventsBatch) {
                             var logMessageString = new StringWriter(new StringBuilder());
                             logEvent.RenderMessage(logMessageString);
-
-                            insertCommand.Parameters["@ts"].Value = _storeTimestampInUtc
-                                ? logEvent.Timestamp.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss.fffzzz")
-                                : logEvent.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fffzzz");
-
+                            var dateTimeOffset = _storeTimestampInUtc ? logEvent.Timestamp.ToUniversalTime() : logEvent.Timestamp;;
+                            insertCommand.Parameters["@ts"].Value = dateTimeOffset.ToString("yyyy-MM-dd HH:mm:ss");
                             insertCommand.Parameters["@level"].Value     = logEvent.Level.ToString();
                             insertCommand.Parameters["@template"].Value = logEvent.MessageTemplate.ToString();
                             insertCommand.Parameters["@msg"].Value      = logMessageString;
